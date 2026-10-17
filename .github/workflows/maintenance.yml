@@ -1,0 +1,113 @@
+name: Monitor MinIO releases and security
+on:
+  schedule:
+    - cron: '17 5 * * 1'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: minio-maintenance
+  cancel-in-progress: false
+jobs:
+  evidence:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Collect upstream, community, registry, and base-image evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/monitor.py collect
+      - name: Publish evidence summary
+        if: always()
+        run: |
+          if [ -f reports/summary.md ]; then cat reports/summary.md >> "$GITHUB_STEP_SUMMARY"; fi
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: maintenance-evidence
+          path: reports/
+          if-no-files-found: error
+          retention-days: 90
+      - name: Require review of security and pinned-input changes
+        run: python3 scripts/monitor.py gate
+
+  security:
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [amd64, arm64]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Scan the consumed digest with a fresh vulnerability database
+        run: bash scripts/scan-image.sh linux/${{ matrix.arch }}
+      - name: Publish vulnerability summary
+        if: always()
+        run: |
+          if [ -f reports/scan-summary.md ]; then cat reports/scan-summary.md >> "$GITHUB_STEP_SUMMARY"; fi
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: maintenance-security-${{ matrix.arch }}
+          path: reports/
+          if-no-files-found: error
+          retention-days: 90
+
+  distribution:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      attestations: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Read the consumed release's immutable evidence
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version=$(python3 -c 'import json; print(json.load(open("monitoring.json"))["release"])')
+          gh release download "$version" --pattern release.json --pattern inputs.json --dir .build/maintenance
+          python3 - <<'PY'
+          import json, os
+          p = json.load(open('monitoring.json'))
+          r = json.load(open('.build/maintenance/release.json'))
+          assert r['digest'] == p['digest'] and r['version'] == p['release']
+          assert r['build_repository'] == 'Yelqo/minio-builds' and r['build_revision'] == p['build_revision']
+          assert r['inputs'] == json.load(open('.build/maintenance/inputs.json'))
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write(f"digest={r['digest']}\nrevision={r['build_revision']}\nversion={p['release']}\n")
+          PY
+      - name: Verify the original release workflow and source identity
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DIGEST: ${{ steps.release.outputs.digest }}
+          REVISION: ${{ steps.release.outputs.revision }}
+          VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          gh attestation verify "oci://ghcr.io/yelqo/minio-builds@$DIGEST" \
+            --repo Yelqo/minio-builds \
+            --signer-workflow Yelqo/minio-builds/.github/workflows/release.yml \
+            --source-ref "refs/tags/$VERSION" --source-digest "$REVISION" --deny-self-hosted-runners
+      - name: Anonymous fresh-store pull and storage qualification
+        env:
+          DIGEST: ${{ steps.release.outputs.digest }}
+        run: |
+          cp .build/maintenance/inputs.json inputs.json
+          bash scripts/verify-distribution.sh "ghcr.io/yelqo/minio-builds@$DIGEST" linux/${{ matrix.arch }}

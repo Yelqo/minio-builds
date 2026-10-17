@@ -98,3 +98,68 @@ Base/toolchain images must still be retrievable by their recorded digests or
 retained in your own OCI archive. This project preserves corresponding source
 for the bundled applications and dependencies; it does not promise perpetual
 availability of Docker Hub's toolchain/distribution images.
+
+## Scheduled maintenance and landscape review
+
+`maintenance.yml` runs weekly on Monday at 05:17 UTC and supports manual dispatch.
+It checks the consumed digest in `monitoring.json`, independently of whichever
+producer release was published most recently. Update that record, including its
+original build revision, when a consumer moves to another qualified release.
+
+The workflow collects upstream server/client advisories, releases, repository
+status, community-project READMEs/releases/issues, GitHub and Hacker News samples,
+Go releases, monitoring-tool versions, official-image manifest observations, and
+builder/runtime tag digests. It also scans **both** image architectures with a
+checksum-pinned Grype binary and a fresh, age-validated vulnerability database,
+and repeats anonymous fresh-store pulls, original release provenance verification,
+and storage smoke checks on native amd64/arm64 runners.
+
+New/revised upstream advisories, a different upstream release or base digest,
+newly reachable official image candidates, or incomplete primary evidence fail
+the evidence gate for human review. Fixable High/Critical scanner findings fail
+the security jobs. Full JSON reports retain all findings, including unfixed and
+unknown-fix vulnerabilities. A failed scanner or unavailable database is a failed
+check, not a clean scan. The initial 2026-10-17 scan already identified fixable
+toolchain/dependency findings; compatibility qualification did not establish
+absence of vulnerabilities. Inspect the current report before deciding changes.
+
+`monitoring-advisories.json` records observed advisory timestamps. It is an
+inventory for detecting new/revised publications, **not** a vulnerability
+suppression or risk-acceptance list. Update it only after reviewing the referenced
+advisories and documenting any required follow-up. Image updates require a new
+reviewed release and consumer qualification; scheduled jobs never publish images,
+edit pins, or update this inventory automatically.
+
+After maintenance completes, `landscape-review.lock.yml` starts a bounded,
+read-only Copilot review, including when maintenance reports security findings.
+It evaluates captured evidence, identifies actionable updates and community
+direction with dated citations, and uploads `landscape-review.md` as a run
+artifact. Missing sources produce an incomplete assessment. Registry manifest
+access is only a candidate lead; adoption still requires complete anonymous pulls,
+edition/support assessment, and compatibility qualification. Community sampling
+does not measure consensus. The agent has no repository write permissions, issue
+or PR output tools, publication credentials, or automatic issue reporters. Its
+only safe output is the report artifact. Inference has turn/tool limits and a
+10-AI-credit guardrail; no paid subscription or additional billing is enabled.
+
+To activate inference in this personal repository, add the Actions secret
+`COPILOT_GITHUB_TOKEN` using a fine-grained PAT from an account with Copilot
+access, with **Account permissions → Copilot Requests: Read** and no repository
+write permissions. [GitHub's authentication instructions](https://github.github.com/gh-aw/reference/auth/#copilot_github_token)
+describe this path. Never put a token in source or a report. With no credential,
+the AI workflow fails explicitly; evidence collection, scans and distribution
+checks still run independently. Free-plan quota/model access must be verified by
+an actual inference run; this setup does not assume unlimited free inference.
+
+Reports are in each run's job summaries and artifacts (90-day retention). GitHub
+workflow failure notifications provide alerts without granting an agent issue
+write access. Review the most recent run's date: GitHub can disable public-repo
+schedules after 60 days without repository activity. Manual dispatch remains an
+available recovery path; an external missed-run monitor is needed if this must be
+an always-on alerting service.
+
+Regenerate the checked-in agent lock with the checksum-pinned gh-aw compiler
+version in `monitoring.json`: `gh aw compile landscape-review`. Commit the Markdown,
+generated lock and `.github/aw/actions-lock.json` together. Keep every generated
+job free of repository write permissions. Run `python3 -m unittest discover -s
+scripts -p 'test_*.py' -v` after changing monitoring policy or report parsing.

@@ -1,0 +1,20 @@
+{
+  "release": "v0.1.0",
+  "digest": "sha256:2552ca331c9f82d77c1ee6f7a87729977704e203f1001fdf42cfd499ee3577a2",
+  "build_revision": "ed0d863e6a4778c3b59b8a9b47eeaccb71369d3b",
+  "consumer": "tsoporto/monorepo integration stacks; update this record when the consumer pin changes",
+  "repositories": ["minio/minio", "minio/mc", "coollabsio/minio", "pgsty/silo"],
+  "official_images": [
+    "docker.io/minio/minio:RELEASE.2025-09-07T16-13-09Z",
+    "docker.io/minio/minio:latest",
+    "quay.io/minio/minio:latest"
+  ],
+  "grype": {
+    "version": "0.120.1",
+    "linux_amd64_sha256": "0a9ee97ef5ae2ee953b0a80098105052e846cdbe319a57d808b519c33cd1343d"
+  },
+  "workflow_compiler": {
+    "version": "0.92.0",
+    "linux_amd64_sha256": "4f1753b20416024b15ff2cbea3f5a8745d7473bd8c73d99b4e8a79d69bb0fe83"
+  }
+}
