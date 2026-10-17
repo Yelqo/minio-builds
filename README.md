@@ -140,7 +140,12 @@ edition/support assessment, and compatibility qualification. Community sampling
 does not measure consensus. The agent has no repository write permissions, issue
 or PR output tools, publication credentials, or automatic issue reporters. Its
 only safe output is the report artifact. Inference has turn/tool limits and a
-10-AI-credit guardrail; no paid subscription or additional billing is enabled.
+10-AI-credit guardrail for each of the review and output-detection stages; no paid
+subscription or additional billing is enabled. Both stages use the concrete
+`gpt-5.6-luna-free-auto` route observed in the account's Copilot model catalog.
+The framework's generic `auto` alias selected an unsupported catalog model during
+verification, so it is not used. If the recorded route becomes unavailable, the
+review must fail explicitly rather than silently select another model.
 
 To activate inference in this personal repository, add the Actions secret
 `COPILOT_GITHUB_TOKEN` using a fine-grained PAT from an account with Copilot

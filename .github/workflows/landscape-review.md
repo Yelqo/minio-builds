@@ -13,7 +13,10 @@ permissions:
   discussions: read
 engine:
   id: copilot
-  model: auto
+  # The framework's `auto` alias selects a catalog model, rather than forwarding
+  # Copilot's account-level Auto choice. Use the Free Auto route observed in
+  # this account's model catalog; an unavailable route must fail explicitly.
+  model: gpt-5.6-luna-free-auto
   copilot-sdk: true
 timeout-minutes: 15
 max-turns: 12
@@ -34,6 +37,9 @@ tools:
   bash: ["cat", "ls", "head", "rg"]
   edit:
 safe-outputs:
+  threat-detection:
+    model: gpt-5.6-luna-free-auto
+    max-ai-credits: 10
   report-failure-as-issue: false
   report-failed-jobs: false
   report-incomplete: false
