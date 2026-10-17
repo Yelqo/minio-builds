@@ -134,10 +134,10 @@ def collect(output):
     fetch("community-github", f"https://api.github.com/search/issues?q={query}&sort=updated&order=desc&per_page=15", False)
     fetch("community-hackernews", "https://hn.algolia.com/api/v1/search_by_date?query=minio&tags=story&hitsPerPage=15", False)
     fetch("go-releases", "https://go.dev/dl/?mode=json", False)
-    for repository, current in (("anchore/grype", policy["grype"]["version"]), ("github/gh-aw", policy["workflow_compiler"]["version"])):
-        latest = fetch(repository.replace("/", "-") + "-latest", f"https://api.github.com/repos/{repository}/releases/latest", False)
-        if latest and latest["tag_name"] != "v" + current:
-            evidence["changes"].append({"kind": "monitoring-tool-update", "repository": repository, "pinned": current, "latest": latest["tag_name"], "url": latest["html_url"]})
+    latest = fetch("anchore-grype-latest", "https://api.github.com/repos/anchore/grype/releases/latest", False)
+    current = policy["grype"]["version"]
+    if latest and latest["tag_name"] != "v" + current:
+        evidence["changes"].append({"kind": "monitoring-tool-update", "repository": "anchore/grype", "pinned": current, "latest": latest["tag_name"], "url": latest["html_url"]})
     evidence["official_images"] = [image_digest(image) for image in policy["official_images"]]
     evidence["changes"].extend({"kind": "official-image-candidate", **item} for item in evidence["official_images"] if item["status"] == "manifest-accessible")
     evidence["base_images"] = []

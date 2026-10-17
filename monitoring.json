@@ -12,9 +12,5 @@
   "grype": {
     "version": "0.120.1",
     "linux_amd64_sha256": "0a9ee97ef5ae2ee953b0a80098105052e846cdbe319a57d808b519c33cd1343d"
-  },
-  "workflow_compiler": {
-    "version": "0.92.0",
-    "linux_amd64_sha256": "4f1753b20416024b15ff2cbea3f5a8745d7473bd8c73d99b4e8a79d69bb0fe83"
   }
 }

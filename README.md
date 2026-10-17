@@ -99,7 +99,7 @@ retained in your own OCI archive. This project preserves corresponding source
 for the bundled applications and dependencies; it does not promise perpetual
 availability of Docker Hub's toolchain/distribution images.
 
-## Scheduled maintenance and landscape review
+## Scheduled maintenance
 
 `maintenance.yml` runs weekly on Monday at 05:17 UTC and supports manual dispatch.
 It checks the consumed digest in `monitoring.json`, independently of whichever
@@ -130,41 +130,19 @@ advisories and documenting any required follow-up. Image updates require a new
 reviewed release and consumer qualification; scheduled jobs never publish images,
 edit pins, or update this inventory automatically.
 
-After maintenance completes, `landscape-review.lock.yml` starts a bounded,
-read-only Copilot review, including when maintenance reports security findings.
-It evaluates captured evidence, identifies actionable updates and community
-direction with dated citations, and uploads `landscape-review.md` as a run
-artifact. Missing sources produce an incomplete assessment. Registry manifest
-access is only a candidate lead; adoption still requires complete anonymous pulls,
-edition/support assessment, and compatibility qualification. Community sampling
-does not measure consensus. The agent has no repository write permissions, issue
-or PR output tools, publication credentials, or automatic issue reporters. Its
-only safe output is the report artifact. Inference has turn/tool limits and a
-10-AI-credit guardrail for each of the review and output-detection stages; no paid
-subscription or additional billing is enabled. Both stages use the concrete
-`gpt-5.6-luna-free-auto` route observed in the account's Copilot model catalog.
-The framework's generic `auto` alias selected an unsupported catalog model during
-verification, so it is not used. If the recorded route becomes unavailable, the
-review must fail explicitly rather than silently select another model.
-
-To activate inference in this personal repository, add the Actions secret
-`COPILOT_GITHUB_TOKEN` using a fine-grained PAT from an account with Copilot
-access, with **Account permissions → Copilot Requests: Read** and no repository
-write permissions. [GitHub's authentication instructions](https://github.github.com/gh-aw/reference/auth/#copilot_github_token)
-describe this path. Never put a token in source or a report. With no credential,
-the AI workflow fails explicitly; evidence collection, scans and distribution
-checks still run independently. Free-plan quota/model access must be verified by
-an actual inference run; this setup does not assume unlimited free inference.
+Review the captured upstream/community evidence alongside the vulnerability
+reports. Community samples do not measure consensus. Registry manifest access
+is only a candidate lead; adoption still requires complete anonymous pulls,
+edition/support assessment, and compatibility qualification. These are
+deterministic, read-only checks with no model calls or inference credentials.
 
 Reports are in each run's job summaries and artifacts (90-day retention). GitHub
-workflow failure notifications provide alerts without granting an agent issue
-write access. Review the most recent run's date: GitHub can disable public-repo
+workflow failure notifications provide alerts. Review the most recent run's date:
+GitHub can disable public-repo
 schedules after 60 days without repository activity. Manual dispatch remains an
 available recovery path; an external missed-run monitor is needed if this must be
 an always-on alerting service.
 
-Regenerate the checked-in agent lock with the checksum-pinned gh-aw compiler
-version in `monitoring.json`: `gh aw compile landscape-review`. Commit the Markdown,
-generated lock and `.github/aw/actions-lock.json` together. Keep every generated
-job free of repository write permissions. Run `python3 -m unittest discover -s
-scripts -p 'test_*.py' -v` after changing monitoring policy or report parsing.
+Run `python3 -m unittest discover -s scripts -p 'test_*.py' -v` after changing
+monitoring policy or report parsing. Keep maintenance jobs free of repository
+write permissions.
