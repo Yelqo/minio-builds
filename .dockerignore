@@ -1,0 +1,16 @@
+*
+!.build/
+!.build/minio.tar.gz
+!.build/mc.tar.gz
+!.build/inputs.env
+!Dockerfile
+!inputs.json
+!LICENSE
+!NOTICE.md
+!README.md
+!SECURITY.md
+!scripts/
+!scripts/**
+!.github/
+!.github/workflows/
+!.github/workflows/**

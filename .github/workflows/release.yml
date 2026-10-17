@@ -1,0 +1,216 @@
+name: Publish and qualify release
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: read
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  build:
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - name: Require a new release tag from reviewed main
+        env:
+          VERSION: ${{ github.ref_name }}
+        run: |
+          [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Refuse to replace an existing platform tag
+        env:
+          IMAGE: ghcr.io/yelqo/minio-builds:${{ github.ref_name }}-${{ matrix.arch }}
+        run: |
+          if docker buildx imagetools inspect "$IMAGE" > /dev/null 2>&1; then
+            echo 'This version already exists; choose a new release version.' >&2
+            exit 1
+          fi
+      - run: python3 scripts/fetch-sources.py
+      - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          platforms: linux/${{ matrix.arch }}
+          load: true
+          tags: minio-builds:candidate
+          build-args: |
+            REVISION=${{ github.sha }}
+            VERSION=${{ github.ref_name }}
+      - run: bash scripts/smoke.sh minio-builds:candidate linux/${{ matrix.arch }}
+      - id: publish
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          platforms: linux/${{ matrix.arch }}
+          push: true
+          tags: ghcr.io/yelqo/minio-builds:${{ github.ref_name }}-${{ matrix.arch }}
+          provenance: mode=max
+          sbom: generator=docker/buildkit-syft-scanner:stable-1@sha256:ae4f3b554449e7e25548e7d8ccc029d17357348e30c6e3df01b92bc93654d6a9
+          build-args: |
+            REVISION=${{ github.sha }}
+            VERSION=${{ github.ref_name }}
+      - name: Preserve platform digest and SBOM
+        env:
+          ARCH: ${{ matrix.arch }}
+          DIGEST: ${{ steps.publish.outputs.digest }}
+        run: |
+          mkdir -p dist
+          printf '%s' "$DIGEST" > "dist/$ARCH.digest"
+          docker buildx imagetools inspect "ghcr.io/yelqo/minio-builds@$DIGEST" --format '{{json .SBOM}}' > "dist/$ARCH.sbom.json"
+          python3 -c 'import json,os; d=json.load(open("dist/"+os.environ["ARCH"]+".sbom.json")); assert d, "Missing SBOM"'
+      - name: Export corresponding source and build instructions
+        if: matrix.arch == 'amd64'
+        run: docker buildx build --target source-bundle --output type=local,dest=dist .
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: producer-${{ matrix.arch }}
+          path: dist/
+          if-no-files-found: error
+          retention-days: 30
+
+  publish:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      packages: write
+      id-token: write
+      attestations: write
+    outputs:
+      digest: ${{ steps.manifest.outputs.digest }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: producer-*
+          path: dist
+          merge-multiple: true
+      - id: manifest
+        env:
+          VERSION: ${{ github.ref_name }}
+        run: |
+          image="ghcr.io/yelqo/minio-builds:$VERSION"
+          if docker buildx imagetools inspect "$image" > /dev/null 2>&1; then
+            echo 'Refusing to replace an existing release manifest.' >&2
+            exit 1
+          fi
+          docker buildx imagetools create --tag "$image" \
+            "ghcr.io/yelqo/minio-builds@$(cat dist/amd64.digest)" \
+            "ghcr.io/yelqo/minio-builds@$(cat dist/arm64.digest)"
+          docker buildx imagetools inspect "$image" --raw > dist/manifest.json
+          digest="sha256:$(sha256sum dist/manifest.json | cut -d' ' -f1)"
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          python3 scripts/release-evidence.py "$VERSION" "$digest"
+      - uses: actions/attest-build-provenance@43d14bc2b83dec42d39ecae14e916627a18bb661 # v3
+        with:
+          subject-name: ghcr.io/yelqo/minio-builds
+          subject-digest: ${{ steps.manifest.outputs.digest }}
+          push-to-registry: true
+      - uses: actions/attest-build-provenance@43d14bc2b83dec42d39ecae14e916627a18bb661 # v3
+        with:
+          subject-path: dist/corresponding-source.tar.gz
+      - name: Create draft release with evidence
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ github.ref_name }}
+        run: |
+          (cd dist && sha256sum -- * > SHA256SUMS)
+          gh release create "$VERSION" dist/* --verify-tag --draft \
+            --title "Unofficial MinIO Community Edition $VERSION" --notes-file dist/release-notes.md
+
+  verify:
+    needs: publish
+    permissions:
+      contents: read
+      packages: read
+      attestations: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Verify expected repository, workflow, tag, and source revision
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DIGEST: ${{ needs.publish.outputs.digest }}
+        run: |
+          gh attestation verify "oci://ghcr.io/yelqo/minio-builds@$DIGEST" \
+            --repo Yelqo/minio-builds \
+            --signer-workflow Yelqo/minio-builds/.github/workflows/release.yml \
+            --source-ref "$GITHUB_REF" --source-digest "$GITHUB_SHA" \
+            --deny-self-hosted-runners
+      - name: Anonymous fresh-store pull and published-image qualification
+        env:
+          IMAGE: ghcr.io/yelqo/minio-builds@${{ needs.publish.outputs.digest }}
+          PLATFORM: linux/${{ matrix.arch }}
+        run: bash scripts/verify-distribution.sh "$IMAGE" "$PLATFORM"
+      - name: Publish verification evidence
+        if: success()
+        env:
+          ARCH: ${{ matrix.arch }}
+          IMAGE: ghcr.io/yelqo/minio-builds@${{ needs.publish.outputs.digest }}
+        run: |
+          mkdir -p dist
+          printf 'PASS anonymous fresh Docker store pull and smoke: %s linux/%s\nWorkflow: %s/%s/actions/runs/%s\n' \
+            "$IMAGE" "$ARCH" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" > "dist/verification-$ARCH.txt"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: verification-${{ matrix.arch }}
+          path: dist/verification-*.txt
+          if-no-files-found: error
+
+  qualify:
+    needs: [publish, verify]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: verification-*
+          path: verification
+          merge-multiple: true
+      - name: Promote qualified release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ github.ref_name }}
+        run: |
+          test -s verification/verification-amd64.txt
+          test -s verification/verification-arm64.txt
+          gh release upload "$VERSION" verification/*
+          gh release edit "$VERSION" --draft=false --latest=false
