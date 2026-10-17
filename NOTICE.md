@@ -11,6 +11,8 @@ installed at `/usr/share/licenses/minio/LICENSE` and
 CREDITS and third-party licenses accompany every release in
 `corresponding-source.tar.gz`, including vendored Go dependency sources and
 their notices. `go.mod`, `go.sum` and `vendor/modules.txt` identify dependencies.
+The image also includes Go's license/patent notice and collected upstream and
+dependency license/notice/credit files in `/usr/share/licenses/bundled/`.
 The base distribution retains its Debian package copyright information.
 
 Packaging changes: source compilation with the pinned Go toolchain; explicit

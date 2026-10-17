@@ -17,6 +17,10 @@ RUN cd /src/mc && sha256sum go.mod go.sum > /tmp/mc-locks && \
 COPY Dockerfile inputs.json LICENSE NOTICE.md README.md SECURITY.md /recipe/
 COPY scripts/ /recipe/scripts/
 COPY .github/ /recipe/.github/
+RUN mkdir -p /licenses/go && cp /usr/local/go/LICENSE /usr/local/go/PATENTS /licenses/go/ && \
+    find /src -type f \( -iname '*license*' -o -iname '*notice*' -o -iname '*copying*' \
+    -o -iname '*copyright*' -o -iname '*credits*' -o -iname '*patents*' \) \
+    -exec cp --parents -t /licenses {} +
 RUN mkdir /release && \
     tar -czf /release/corresponding-source.tar.gz -C / src recipe archives inputs.env && \
     cp /recipe/inputs.json /release/ && \
@@ -48,6 +52,7 @@ COPY --from=builder /out/ /usr/local/bin/
 COPY --from=sources /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=sources /src/minio/LICENSE /usr/share/licenses/minio/LICENSE
 COPY --from=sources /src/mc/LICENSE /usr/share/licenses/mc/LICENSE
+COPY --from=sources /licenses/ /usr/share/licenses/bundled/
 COPY NOTICE.md inputs.json /usr/share/doc/minio-builds/
 COPY --chmod=755 scripts/entrypoint.sh /usr/local/bin/entrypoint
 EXPOSE 9000 9001

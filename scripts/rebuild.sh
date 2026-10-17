@@ -15,6 +15,10 @@ FROM --platform=$BUILDPLATFORM ${BUILDER} AS sources
 COPY src /src
 COPY inputs.env /inputs.env
 COPY scripts /recipe/scripts
+RUN mkdir -p /licenses/go && cp /usr/local/go/LICENSE /usr/local/go/PATENTS /licenses/go/ && \
+    find /src -type f \( -iname '*license*' -o -iname '*notice*' -o -iname '*copying*' \
+    -o -iname '*copyright*' -o -iname '*credits*' -o -iname '*patents*' \) \
+    -exec cp --parents -t /licenses {} +
 DOCKER
 # Reuse the reviewed offline compiler and identical runtime recipe.
 sed -n '/^FROM sources AS builder/,$p' Dockerfile >> "$scratch/Dockerfile"
