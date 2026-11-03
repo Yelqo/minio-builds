@@ -43,3 +43,37 @@ another advisory review and both producer and consumer qualification.
 Prior art reviewed: https://github.com/coollabsio/minio for source builds and
 https://github.com/pgsty/silo for release evidence. This recipe is independent;
 it does not select moving upstream inputs or adopt the Silo server fork.
+
+## Distribution maintenance, 2026-11-03
+
+The [2026-11-02 maintenance run](https://github.com/Yelqo/minio-builds/actions/runs/41454355884)
+scanned the consumed `v0.1.0` digest on both architectures with a fresh database.
+Each architecture reported 68 fixable High/Critical package findings (17 Critical,
+51 High; 53 distinct advisory IDs). These are scanner matches, not an assessment
+that every affected code path is reachable in our test configuration.
+
+The next build updates Go from 1.26.8 to 1.26.10 and refreshes the pinned
+`debian:bookworm-slim` multi-platform digest. The upstream server/client revisions
+and their dependency locks remain unchanged. Go and Debian updates cannot
+remediate inherited application dependencies such as `golang.org/x/crypto`,
+`golang.org/x/net`, gRPC and AMQP. Do not treat this input refresh as complete
+remediation or qualify a release while its scans fail. Dependency patches or
+adoption of a maintained fork need a separate reviewed source decision, updated
+source/lock evidence and compatibility qualification.
+
+Local validation of the refreshed inputs passed amd64 compilation and arm64
+cross-compilation. The amd64 image passed the existing version, readiness,
+object round-trip and restricted-user checks; native arm64 runtime qualification
+remains a CI requirement. Grype 0.121.1 with database built
+`2026-11-03T06:20:47Z` reported 269 total package findings on each architecture,
+including **48 fixable High/Critical findings** (11 Critical, 37 High), all in
+inherited Go dependencies. No Go standard-library or Debian
+package matches remained in that fixable High/Critical set. The scan exited
+nonzero as required; the candidate is **not qualified**. These timestamped
+counts do not replace the mandatory fresh scan of a release's exact digest.
+
+Grype 0.121.1 is checksum-pinned for both native runner architectures. Candidate
+validation and published-image qualification now enforce the same fresh-database,
+fixable High/Critical gate as maintenance. Failed scans retain reports; there are
+no scanner suppressions or exceptions. `monitoring.json` continues tracking the
+consumed `v0.1.0` digest until a new qualified release passes consumer adoption.
