@@ -31,3 +31,17 @@ jobs:
             REVISION=${{ github.sha }}
             VERSION=validation
       - run: bash scripts/smoke.sh minio-builds:validation linux/${{ matrix.arch }}
+      - name: Scan the candidate before any release is tagged
+        run: bash scripts/scan-image.sh linux/${{ matrix.arch }} docker:minio-builds:validation
+      - name: Publish security summary
+        if: always()
+        run: |
+          if [ -f reports/scan-summary.md ]; then cat reports/scan-summary.md >> "$GITHUB_STEP_SUMMARY"; fi
+      - name: Publish candidate security evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: validation-security-${{ matrix.arch }}
+          path: reports/
+          if-no-files-found: warn
+          retention-days: 90

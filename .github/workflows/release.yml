@@ -5,10 +5,29 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: release-${{ github.ref }}
+  group: minio-release
   cancel-in-progress: false
 jobs:
+  preflight:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Require a new release version from reviewed main
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ github.ref_name }}
+        run: |
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main
+          mkdir -p .build
+          gh api --paginate --jq '.[] | @json' "repos/$GITHUB_REPOSITORY/releases?per_page=100" > .build/published-releases.jsonl
+          python3 scripts/release_policy.py "$VERSION" .build/published-releases.jsonl
+
   build:
+    needs: preflight
     permissions:
       contents: read
       packages: write
@@ -160,7 +179,7 @@ jobs:
           - arch: arm64
             runner: ubuntu-24.04-arm
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Verify expected repository, workflow, tag, and source revision
@@ -178,6 +197,23 @@ jobs:
           IMAGE: ghcr.io/yelqo/minio-builds@${{ needs.publish.outputs.digest }}
           PLATFORM: linux/${{ matrix.arch }}
         run: bash scripts/verify-distribution.sh "$IMAGE" "$PLATFORM"
+      - name: Scan the exact published digest before qualification
+        env:
+          IMAGE: registry:ghcr.io/yelqo/minio-builds@${{ needs.publish.outputs.digest }}
+          PLATFORM: linux/${{ matrix.arch }}
+        run: bash scripts/scan-image.sh "$PLATFORM" "$IMAGE"
+      - name: Publish security summary
+        if: always()
+        run: |
+          if [ -f reports/scan-summary.md ]; then cat reports/scan-summary.md >> "$GITHUB_STEP_SUMMARY"; fi
+      - name: Publish security evidence even when qualification fails
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: release-security-${{ matrix.arch }}
+          path: reports/
+          if-no-files-found: warn
+          retention-days: 90
       - name: Publish verification evidence
         if: success()
         env:
@@ -204,6 +240,10 @@ jobs:
           pattern: verification-*
           path: verification
           merge-multiple: true
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: release-security-*
+          path: security
       - name: Promote qualified release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -212,5 +252,12 @@ jobs:
         run: |
           test -s verification/verification-amd64.txt
           test -s verification/verification-arm64.txt
+          for arch in amd64 arm64; do
+            for report in grype.json findings.json scan-summary.md scan-target.json; do
+              test -s "security/release-security-$arch/$report"
+              cp "security/release-security-$arch/$report" "verification/security-$arch-$report"
+            done
+          done
+          (cd verification && sha256sum -- verification-*.txt security-*-grype.json security-*-findings.json security-*-scan-summary.md security-*-scan-target.json > verification-SHA256SUMS)
           gh release upload "$VERSION" verification/*
-          gh release edit "$VERSION" --draft=false --latest=false
+          gh release edit "$VERSION" --draft=false --latest

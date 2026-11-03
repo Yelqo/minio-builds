@@ -11,6 +11,7 @@
   ],
   "grype": {
     "version": "0.120.1",
-    "linux_amd64_sha256": "0a9ee97ef5ae2ee953b0a80098105052e846cdbe319a57d808b519c33cd1343d"
+    "linux_amd64_sha256": "0a9ee97ef5ae2ee953b0a80098105052e846cdbe319a57d808b519c33cd1343d",
+    "linux_arm64_sha256": "29f47391dc283aa79fcc38e65224cd61f64dec0ecfd0db7074128ebf8ff23514"
   }
 }

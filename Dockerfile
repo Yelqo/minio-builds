@@ -14,7 +14,7 @@ RUN cd /src/minio && sha256sum go.mod go.sum > /tmp/minio-locks && \
     go mod download && go mod verify && go mod vendor && sha256sum -c /tmp/minio-locks
 RUN cd /src/mc && sha256sum go.mod go.sum > /tmp/mc-locks && \
     go mod download && go mod verify && go mod vendor && sha256sum -c /tmp/mc-locks
-COPY Dockerfile inputs.json LICENSE NOTICE.md README.md SECURITY.md /recipe/
+COPY Dockerfile inputs.json monitoring.json monitoring-advisories.json LICENSE NOTICE.md README.md SECURITY.md /recipe/
 COPY scripts/ /recipe/scripts/
 COPY .github/ /recipe/.github/
 RUN mkdir -p /licenses/go && cp /usr/local/go/LICENSE /usr/local/go/PATENTS /licenses/go/ && \

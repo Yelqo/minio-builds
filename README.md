@@ -66,9 +66,13 @@ Only throwaway test credentials and networks are appropriate.
 1. Review inputs, remaining advisories and recipe changes on `main`. The
    validation workflow builds and smoke-tests each native architecture without
    registry write permissions. This includes version/commit checks, readiness,
-   bucket/object round trips and restricted-user policy enforcement.
+   bucket/object round trips and restricted-user policy enforcement. It also
+   scans each local candidate with a fresh vulnerability database. Fixable
+   High/Critical findings, an unavailable scanner or invalid/stale database
+   fail validation; dependency findings require remediation, not suppression.
 2. Push a new `vMAJOR.MINOR.PATCH` tag whose commit is on `main`. The release
-   workflow rejects existing version manifests. Its repository-scoped Actions
+   workflow serializes releases, requires a version newer than all published
+   stable releases, and rejects existing version manifests. Its repository-scoped Actions
    token alone writes packages, provenance and release assets; no personal
    registry token is needed.
 3. Both architectures are built and tested before publication of their
@@ -88,10 +92,15 @@ Only throwaway test credentials and networks are appropriate.
    They resolve both manifest entries, pull the exact manifest digest, verify
    the GitHub attestation against this repository, tagged source commit and
    `.github/workflows/release.yml` identity, then repeat all smoke checks.
-   Cleanup runs after success and failure. A manifest-only check is insufficient.
+   Each architecture's exact published digest is also scanned with a fresh
+   database. Fixable High/Critical findings or scan failures block promotion.
+   Full scan reports are retained as workflow artifacts even when scanning
+   fails. Cleanup runs after success and failure. A manifest-only check is insufficient.
 6. If the first verification failed while the package was private, change the
    setting and **rerun failed jobs only**. Do not rerun builds to replace a tag.
-   The release becomes public only after both verification jobs pass. Record
+   The release becomes public and GitHub Latest only after both architecture
+   verification jobs, including their security scans, pass. Their scan reports
+   and supplemental checksums are attached to the release. Record
    the verified digest and workflow URL in the consumer PR, run existing
    recovery and full integration qualification, and retain corpus/latency gates.
 

@@ -1,4 +1,4 @@
-name: Validate maintenance monitoring
+name: Validate release and monitoring policy
 on:
   pull_request:
   push:
