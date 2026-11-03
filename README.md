@@ -12,6 +12,33 @@ from a **published, qualified release**, never a moving tag or candidate alone.
 There is no `latest` tag. Never rebuild or overwrite a consumed version; use a
 new release identity for changed source, toolchain, base or recipe inputs.
 
+## Maintenance policy
+
+We maintain the newest qualified release of **this distribution**. Our version
+identifies the complete server/client image, independently of upstream MinIO's
+release names. A new build can retain the same upstream source while updating
+Go, Debian, dependencies or the build recipe.
+
+Compatible maintenance updates increment the patch version, for example
+`v0.1.0` to `v0.1.1`. While this distribution is pre-1.0, changes to its
+container interface or compatibility contract increment the minor version and
+require explicit migration notes. Release notes record the changed inputs,
+security findings and qualification evidence.
+
+Older versions and their source/evidence remain available for reproducibility
+and rollback. They receive no backports or separate maintenance branches. Fixes land
+in the next release; retaining an old image does not make it maintained or
+safe to run. Distribution maintenance does not promise upstream security fixes.
+Application patches or a switch to a maintained fork require an explicit source
+decision and compatibility review.
+
+Weekly monitoring identifies work; publish when reviewed input changes or fixes
+warrant a release, prioritizing security updates. Do not rebuild unchanged inputs
+on a schedule. The newest qualified release is marked **Latest on GitHub** for
+discovery; the container registry has no moving `latest` tag. Consumers adopt
+each version and digest through a reviewed change and integration qualification.
+Keep `monitoring.json` on the image actually consumed until that adoption passes.
+
 ## Build and inspect
 
 `inputs.json` records full server/client commit IDs, human-readable releases,
