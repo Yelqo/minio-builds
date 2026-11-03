@@ -12,6 +12,33 @@ from a **published, qualified release**, never a moving tag or candidate alone.
 There is no `latest` tag. Never rebuild or overwrite a consumed version; use a
 new release identity for changed source, toolchain, base or recipe inputs.
 
+## Maintenance policy
+
+We maintain the newest qualified release of **this distribution**. Our version
+identifies the complete server/client image, independently of upstream MinIO's
+release names. A new build can retain the same upstream source while updating
+Go, Debian, dependencies or the build recipe.
+
+Compatible maintenance updates increment the patch version, for example
+`v0.1.0` to `v0.1.1`. While this distribution is pre-1.0, changes to its
+container interface or compatibility contract increment the minor version and
+require explicit migration notes. Release notes record the changed inputs,
+security findings and qualification evidence.
+
+Older versions and their source/evidence remain available for reproducibility
+and rollback. They receive no backports or separate maintenance branches. Fixes land
+in the next release; retaining an old image does not make it maintained or
+safe to run. Distribution maintenance does not promise upstream security fixes.
+Application patches or a switch to a maintained fork require an explicit source
+decision and compatibility review.
+
+Weekly monitoring identifies work; publish when reviewed input changes or fixes
+warrant a release, prioritizing security updates. Do not rebuild unchanged inputs
+on a schedule. The newest qualified release is marked **Latest on GitHub** for
+discovery; the container registry has no moving `latest` tag. Consumers adopt
+each version and digest through a reviewed change and integration qualification.
+Keep `monitoring.json` on the image actually consumed until that adoption passes.
+
 ## Build and inspect
 
 `inputs.json` records full server/client commit IDs, human-readable releases,
@@ -39,9 +66,13 @@ Only throwaway test credentials and networks are appropriate.
 1. Review inputs, remaining advisories and recipe changes on `main`. The
    validation workflow builds and smoke-tests each native architecture without
    registry write permissions. This includes version/commit checks, readiness,
-   bucket/object round trips and restricted-user policy enforcement.
+   bucket/object round trips and restricted-user policy enforcement. It also
+   scans each local candidate with a fresh vulnerability database. Fixable
+   High/Critical findings, an unavailable scanner or invalid/stale database
+   fail validation; dependency findings require remediation, not suppression.
 2. Push a new `vMAJOR.MINOR.PATCH` tag whose commit is on `main`. The release
-   workflow rejects existing version manifests. Its repository-scoped Actions
+   workflow serializes releases, requires a version newer than all published
+   stable releases, and rejects existing version manifests. Its repository-scoped Actions
    token alone writes packages, provenance and release assets; no personal
    registry token is needed.
 3. Both architectures are built and tested before publication of their
@@ -61,10 +92,15 @@ Only throwaway test credentials and networks are appropriate.
    They resolve both manifest entries, pull the exact manifest digest, verify
    the GitHub attestation against this repository, tagged source commit and
    `.github/workflows/release.yml` identity, then repeat all smoke checks.
-   Cleanup runs after success and failure. A manifest-only check is insufficient.
+   Each architecture's exact published digest is also scanned with a fresh
+   database. Fixable High/Critical findings or scan failures block promotion.
+   Full scan reports are retained as workflow artifacts even when scanning
+   fails. Cleanup runs after success and failure. A manifest-only check is insufficient.
 6. If the first verification failed while the package was private, change the
    setting and **rerun failed jobs only**. Do not rerun builds to replace a tag.
-   The release becomes public only after both verification jobs pass. Record
+   The release becomes public and GitHub Latest only after both architecture
+   verification jobs, including their security scans, pass. Their scan reports
+   and supplemental checksums are attached to the release. Record
    the verified digest and workflow URL in the consumer PR, run existing
    recovery and full integration qualification, and retain corpus/latency gates.
 

@@ -5,6 +5,8 @@
 !.build/inputs.env
 !Dockerfile
 !inputs.json
+!monitoring.json
+!monitoring-advisories.json
 !LICENSE
 !NOTICE.md
 !README.md

@@ -7,6 +7,7 @@ import sys
 
 version, digest = sys.argv[1:]
 inputs = json.loads(Path("inputs.json").read_text())
+scanner = json.loads(Path("monitoring.json").read_text())["grype"]
 manifest = json.loads(Path("dist/manifest.json").read_text())
 platforms = {
     entry["platform"]["architecture"]: entry["digest"]
@@ -24,7 +25,8 @@ evidence = {
     "workflow": workflow,
     "platform_manifests": platforms,
     "inputs": inputs,
-    "qualification": "Draft until both independent anonymous-pull qualification jobs pass",
+    "security_scanner": scanner,
+    "qualification": "Draft until both architectures pass anonymous-pull qualification and fresh vulnerability scans",
     "reproducibility": "Controlled-input build; bit-for-bit reproducibility not verified",
 }
 Path("dist/release.json").write_text(json.dumps(evidence, indent=2) + "\n")
@@ -33,7 +35,15 @@ Path("dist/release-notes.md").write_text(
     f"Image: `{evidence['image']}`\n\nBuild revision: `{evidence['build_revision']}`. "
     f"[Build and qualification evidence]({workflow}).\n\n"
     "This release is promoted from draft only after amd64 and arm64 anonymous "
-    "fresh-store pulls, constrained provenance verification, readiness and S3/policy checks pass.\n\n"
+    "fresh-store pulls, constrained provenance verification, readiness, S3/policy checks "
+    "and fresh vulnerability scans of the published digest pass. Fixable High/Critical "
+    "scanner findings block promotion. Per-architecture scan reports accompany this release.\n\n"
+    f"Server: `{inputs['server']['release']}` (`{inputs['server']['commit']}`).\n\n"
+    f"Client: `{inputs['client']['release']}` (`{inputs['client']['commit']}`).\n\n"
+    f"Builder: `{inputs['builder']}`.\n\nRuntime: `{inputs['runtime']}`.\n\n"
+    f"Security scanner: Grype `{scanner['version']}`; binary checksums are recorded in `release.json`.\n\n"
+    "Only the newest qualified distribution release receives maintenance; older releases "
+    "are retained for reproducibility and rollback without backports.\n\n"
     "Source, vendored dependencies, complete recipe, licenses, dependency locks, platform SBOMs, "
     "checksums and release inputs accompany this release. BuildKit SBOM and provenance "
     "are also attached to the platform OCI indexes; GitHub build provenance binds the final digest.\n\n"

@@ -1,5 +1,5 @@
-ARG BUILDER=golang:1.26.8-bookworm@sha256:dc9ad6c05acc7a88e5b71bde60a5fe3bd4b9f0db209011711b464107438a8107
-ARG RUNTIME=debian:bookworm-slim@sha256:7c7b2c966bc9ee8cedfeef67e0e279108992c77681fa595db4a9d65c06ccc587
+ARG BUILDER=golang:1.26.10-bookworm@sha256:23ce71337b726608afb1bc00986e630a05034a87a87ea1fc2cd1ae5cf33387eb
+ARG RUNTIME=debian:bookworm-slim@sha256:99c0b25c46d0214d5a2091092e7908907dcaecd6a962cde0ac700acee222b6f3
 FROM --platform=$BUILDPLATFORM ${BUILDER} AS sources
 ENV GOTOOLCHAIN=local
 COPY .build/inputs.env /inputs.env
@@ -14,7 +14,7 @@ RUN cd /src/minio && sha256sum go.mod go.sum > /tmp/minio-locks && \
     go mod download && go mod verify && go mod vendor && sha256sum -c /tmp/minio-locks
 RUN cd /src/mc && sha256sum go.mod go.sum > /tmp/mc-locks && \
     go mod download && go mod verify && go mod vendor && sha256sum -c /tmp/mc-locks
-COPY Dockerfile inputs.json LICENSE NOTICE.md README.md SECURITY.md /recipe/
+COPY Dockerfile inputs.json monitoring.json monitoring-advisories.json LICENSE NOTICE.md README.md SECURITY.md /recipe/
 COPY scripts/ /recipe/scripts/
 COPY .github/ /recipe/.github/
 RUN mkdir -p /licenses/go && cp /usr/local/go/LICENSE /usr/local/go/PATENTS /licenses/go/ && \

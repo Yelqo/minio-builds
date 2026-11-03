@@ -10,7 +10,8 @@
     "quay.io/minio/minio:latest"
   ],
   "grype": {
-    "version": "0.120.1",
-    "linux_amd64_sha256": "0a9ee97ef5ae2ee953b0a80098105052e846cdbe319a57d808b519c33cd1343d"
+    "version": "0.121.1",
+    "linux_amd64_sha256": "bc3ea3f9e6fd56ac781c08c6c5e614271b79f438200757f6932085c19b0a4657",
+    "linux_arm64_sha256": "33670612aad351c48cf3c37f4a85d8b043d1b64b21e6034e675bb00b956d78c1"
   }
 }
